@@ -1,0 +1,85 @@
+<div class="site-footer">
+  Docs Version:
+  <select id="docs-version" onChange="changeVersion(this)">
+  </select>
+</div>
+
+<script>
+changeVersion = function handleVersionedDocs() {
+    const baseUrl = '{{ site.baseurl }}';
+    const repoName = '{{ site.github.repository_nwo }}';
+
+    async function loadOptions(select) {
+        const defaultBranchPromise = axios.get(
+            'https://api.github.com/repos/' + repoName,
+        );
+
+        let res = await axios.get(
+            'https://api.github.com/repos/' + repoName + '/git/trees/gh-pages',
+        );
+        const versionDir = res.data.tree.find(t => {
+            return t.path.toLowerCase() === 'version';
+        });
+
+        if (versionDir === undefined ) {
+            var options = [];
+        } else {
+            res = await axios.get(versionDir.url);
+            var options = res.data.tree.map(t => {
+                return {value: t.path, text: t.path};
+            });
+        };
+
+        options = options.sort( (a, b) => b.value.localeCompare(a.value, undefined, { numeric:true }) );
+
+        const defaultBranch = await defaultBranchPromise.then(r => {
+            return r.data.default_branch;
+        });
+        options.unshift({ value: 'latest', text: defaultBranch });
+
+        options.forEach( item => {
+            var opt = document.createElement('option');
+            opt.value = item.value;
+            opt.innerHTML = item.text;
+
+            select.appendChild(opt);
+        });
+
+        const path = window.location.pathname.toLowerCase();
+        if (path.startsWith(baseUrl + '/version/')) {
+            const start = baseUrl.length + 9;
+            const end = path.indexOf('/', start);
+            select.selected = path.substring(start, end);
+        } else {
+            select.selected = defaultBranch;
+        }
+    };
+
+    function removeStartingSlash(str) {
+        return str.startsWith('/') ? str.slice(0, -1) : str;
+    };
+
+    function changeVersion(selectElement) {
+        console.log(selectElement);
+        const targetVersionPath =
+            selectElement.value === 'latest' ? '' : `/version/${selectElement.value}`;
+
+        const path = window.location.pathname.toLowerCase();
+        let startIdx = 0;
+        const versionIdx = path.indexOf('/version/');
+        if (versionIdx >= 0) {
+            startIdx = versionIdx + 9;
+        }
+        const endIdx = path.indexOf('/', startIdx);
+        targetPath =
+            window.location.pathname.substring(0, 9) +
+            targetVersionPath +
+            window.location.pathname.substring(endIdx);
+        window.location.pathname = targetPath.replace(/([^:])(\/\/+)/g, '$1/');
+    };
+
+    loadOptions(document.getElementById("docs-version"));
+
+    return changeVersion;
+}();
+</script>
